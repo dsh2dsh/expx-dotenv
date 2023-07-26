@@ -60,6 +60,15 @@ func (self *Loader) WithDepth(n int) *Loader {
 // instance with s == "production" it'll search also for ".env.production.local"
 // and ".env.production". With s == "test" - ".env.test.local" and
 // ".env.test". And so on.
+//
+// This example configures env to read environment name from "ENV" environment
+// variable:
+//
+//	env := dotenv.New()
+//	env.WithEnvVarName("ENV")
+//
+// So if "ENV" environment variable contains "test", next call to [Load] will
+// try to load ".env.test*" files. See [Load] for details.
 func (self *Loader) WithEnvVarName(s string) *Loader {
 	if v, ok := os.LookupEnv(s); ok {
 		self.envSuffix = v
@@ -83,7 +92,7 @@ func (self *Loader) WithRootDir(path string) *Loader {
 }
 
 // WithRootFiles configures [Load] to stop at current dir or any parent dir,
-// which contains any of file with name from fnames list.
+// which contains any of file (or dir) with name from fnames list.
 func (self *Loader) WithRootFiles(fnames ...string) *Loader {
 	self.rootFiles = fnames
 	return self

@@ -96,7 +96,7 @@ func (self *Loader) WithRootFiles(fnames ...string) *Loader {
 //  1. true means stop at this dir
 //  2. any error
 //
-// [FileExistsInDir] may be usefull in here.
+// [FileExistsInDir] may be useful in here.
 func (self *Loader) WithRootCallback(fn func(path string) (bool, error),
 ) *Loader {
 	self.rootCb = fn
@@ -136,7 +136,7 @@ func (self *Loader) WithRootCallback(fn func(path string) (bool, error),
 func (self *Loader) Load() error {
 	if envs, err := self.lookupEnvFiles(); err != nil {
 		return err
-	} else if envs == nil || len(envs) == 0 {
+	} else if len(envs) == 0 {
 		return nil
 	} else if err := godotenv.Load(envs...); err != nil {
 		return fmt.Errorf("can't load %v: %w", envs, err)
@@ -148,7 +148,7 @@ func (self *Loader) Load() error {
 // FileExistsInDir checks if file named fname exists in dir named dirName and
 // returns true, if it exists, or false.
 //
-// May be usefull in a callback, configured by [WithRootCallback].
+// May be useful in a callback, configured by [WithRootCallback].
 func (self *Loader) FileExistsInDir(dirName, fname string) (bool, error) {
 	if dirName != "" {
 		fname = filepath.Join(dirName, fname)
@@ -292,7 +292,7 @@ func (self *Loader) nextParentDir(curDir string) (string, error) {
 
 	for _, fname := range self.rootFiles {
 		if exists, err := self.FileExistsInDir(curDir, fname); err != nil {
-			return "", fmt.Errorf("check existance of file %v in dir %v: %w", fname,
+			return "", fmt.Errorf("check existence of file %v in dir %v: %w", fname,
 				curDir, err)
 		} else if exists {
 			return "", nil

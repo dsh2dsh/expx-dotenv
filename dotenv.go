@@ -47,19 +47,19 @@ type Loader struct {
 	rootFiles []string
 }
 
-// WithDepth configures [Load] don't go up deeper and stop searching for .env
-// files at n level. Current dir has n == 1, first parent dir has n == 2 and so
-// on.
+// WithDepth configures [Loader.Load] don't go up deeper and stop searching for
+// .env files at n level. Current dir has n == 1, first parent dir has n == 2
+// and so on.
 func (self *Loader) WithDepth(n int) *Loader {
 	self.lookupDepth = n
 	return self
 }
 
 // WithEnvVarName reads name of current environment from s environment variable
-// and configures [Load] for searching and loading of .env.CURENV* files. For
-// instance with s == "production" it'll search also for ".env.production.local"
-// and ".env.production". With s == "test" - ".env.test.local" and
-// ".env.test". And so on.
+// and configures [Loader.Load] for searching and loading of .env.CURENV*
+// files. For instance with s == "production" it'll search also for
+// ".env.production.local" and ".env.production". With s == "test" -
+// ".env.test.local" and ".env.test". And so on.
 //
 // This example configures env to read environment name from "ENV" environment
 // variable:
@@ -67,8 +67,8 @@ func (self *Loader) WithDepth(n int) *Loader {
 //	env := dotenv.New()
 //	env.WithEnvVarName("ENV")
 //
-// So if "ENV" environment variable contains "test", next call to [Load] will
-// try to load ".env.test*" files. See [Load] for details.
+// So if "ENV" environment variable contains "test", next call to [Loader.Load]
+// will try to load ".env.test*" files. See [Loader.Load] for details.
 func (self *Loader) WithEnvVarName(s string) *Loader {
 	if v, ok := os.LookupEnv(s); ok {
 		self.envSuffix = v
@@ -77,13 +77,13 @@ func (self *Loader) WithEnvVarName(s string) *Loader {
 }
 
 // WithEnvSuffix directly sets name of current environment to s. See
-// [WithEnvVarName] above for details.
+// [Loader.WithEnvVarName] above for details.
 func (self *Loader) WithEnvSuffix(s string) *Loader {
 	self.envSuffix = s
 	return self
 }
 
-// WithRootDir configures [Load] to stop at path dir and don't go up.
+// WithRootDir configures [Loader.Load] to stop at path dir and don't go up.
 func (self *Loader) WithRootDir(path string) *Loader {
 	if absPath, err := filepath.Abs(path); err == nil {
 		self.rootDir = absPath
@@ -91,21 +91,21 @@ func (self *Loader) WithRootDir(path string) *Loader {
 	return self
 }
 
-// WithRootFiles configures [Load] to stop at current dir or any parent dir,
-// which contains any of file (or dir) with name from fnames list.
+// WithRootFiles configures [Loader.Load] to stop at current dir or any parent
+// dir, which contains any of file (or dir) with name from fnames list.
 func (self *Loader) WithRootFiles(fnames ...string) *Loader {
 	self.rootFiles = fnames
 	return self
 }
 
-// WithRootCallback configures [Load] to call fn function for every dir it
-// visits. It passes absolute path of current dir as path param and expects two
-// return values:
+// WithRootCallback configures [Loader.Load] to call fn function for every dir
+// it visits. It passes absolute path of current dir as path param and expects
+// two return values:
 //
 //  1. true means stop at this dir
 //  2. any error
 //
-// [FileExistsInDir] may be useful in here.
+// [Loader.FileExistsInDir] may be useful in here.
 func (self *Loader) WithRootCallback(fn func(path string) (bool, error),
 ) *Loader {
 	self.rootCb = fn
@@ -116,15 +116,16 @@ func (self *Loader) WithRootCallback(fn func(path string) (bool, error),
 // found it tries parent dir and parent of parent dir and so on, until it'll
 // find any of .env files or will reach any of configured condition:
 //
-//  1. Visited dir is at level configured by [WithDepth], where level 1 is
-//     current dir, level 2 is parent dir and so on.
-//  2. Visited dir is a root dir configured by [WithRootDir].
-//  3. Visited dir has any of file with names configured by [WithRootFiles].
-//  4. A callback function was configured by [WithRootCallback] and that
+//  1. Visited dir is at level configured by [Loader.WithDepth], where level 1
+//     is current dir, level 2 is parent dir and so on.
+//  2. Visited dir is a root dir configured by [Loader.WithRootDir].
+//  3. Visited dir has any of file with names configured by
+//     [Loader.WithRootFiles].
+//  4. A callback function was configured by [Loader.WithRootCallback] and that
 //     function returned true for visited dir.
 //
-// If name of environment wasn't configured by [WithEnvVarName] or
-// [WithEnvSuffix], Load is looking for:
+// If name of environment wasn't configured by [Loader.WithEnvVarName] or
+// [Loader.WithEnvSuffix], Load is looking for:
 //
 //  1. env.local
 //  2. .env
@@ -157,7 +158,7 @@ func (self *Loader) Load() error {
 // FileExistsInDir checks if file named fname exists in dir named dirName and
 // returns true, if it exists, or false.
 //
-// May be useful in a callback, configured by [WithRootCallback].
+// May be useful in a callback, configured by [Loader.WithRootCallback].
 func (self *Loader) FileExistsInDir(dirName, fname string) (bool, error) {
 	if dirName != "" {
 		fname = filepath.Join(dirName, fname)
@@ -210,7 +211,7 @@ func (self *Loader) lookupEnvFiles() ([]string, error) {
 }
 
 // envFile returns list of .env files for searching, according to configured
-// name of environment. See [Load] for details.
+// name of environment. See [Loader.Load] for details.
 func (self *Loader) envFiles() []string {
 	envName := self.envSuffix
 	if envName == "" {
@@ -311,7 +312,7 @@ func (self *Loader) nextParentDir(curDir string) (string, error) {
 	return filepath.Dir(curDir), nil
 }
 
-// stopByRootCb calls a function, configured by [WithRootCallback], with
+// stopByRootCb calls a function, configured by [Loader.WithRootCallback], with
 // absolute path, and returns its return values. true means stop at this path
 // and false means continue to parent dir.
 func (self *Loader) stopByRootCb(path string) (bool, error) {

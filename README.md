@@ -1,6 +1,7 @@
 # Go high level wrapper around [godotenv](https://github.com/joho/godotenv)
 
 [![Go](https://github.com/dsh2dsh/expx-dotenv/actions/workflows/go.yml/badge.svg)](https://github.com/dsh2dsh/expx-dotenv/actions/workflows/go.yml)
+[![Go Reference](https://pkg.go.dev/badge/github.com/dsh2dsh/expx-dotenv.svg)](https://pkg.go.dev/github.com/dsh2dsh/expx-dotenv)
 
 It allows to load one or multiple .env file(s) according to [original
 rules](https://github.com/bkeepers/dotenv#what-other-env-files-can-i-use). It

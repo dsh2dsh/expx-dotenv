@@ -9,6 +9,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var allEnvVars = []string{"TEST_VAR1", "TEST_VAR2"}
+
 func valueNoError[V any](t *testing.T) func(val V, err error) V {
 	return func(val V, err error) V {
 		require.NoError(t, err)
@@ -205,14 +207,6 @@ func TestLoader_checkLookupDepth(t *testing.T) {
 }
 
 func TestLoad(t *testing.T) {
-	curDir := valueNoError[string](t)(os.Getwd())
-	t.Cleanup(func() {
-		require.NoError(t, os.Chdir(curDir))
-	})
-
-	const testEnvVar = "TEST_VAR1"
-	const testEnvVal = "testdata"
-
 	tests := []struct {
 		name       string
 		dir        string
@@ -224,19 +218,19 @@ func TestLoad(t *testing.T) {
 		{
 			name:       "in root dir",
 			dir:        "testdata",
-			envVarName: testEnvVar,
-			expect:     testEnvVal,
+			envVarName: allEnvVars[0],
+			expect:     "testdata",
 		},
 		{
 			name:       "in subdir",
 			dir:        "testdata/a",
-			envVarName: testEnvVar,
-			expect:     testEnvVal,
+			envVarName: allEnvVars[0],
+			expect:     "testdata",
 		},
 		{
 			name:       "with test suffix",
 			dir:        "testdata/a",
-			envVarName: testEnvVar,
+			envVarName: allEnvVars[0],
 			expect:     "testdata-test",
 			before: func(t *testing.T, env *Loader) {
 				env.WithEnvSuffix("test")
@@ -245,7 +239,7 @@ func TestLoad(t *testing.T) {
 		{
 			name:       "with test suffix but from .env",
 			dir:        "testdata/a",
-			envVarName: "TEST_VAR2",
+			envVarName: allEnvVars[1],
 			expect:     "testdata2",
 			before: func(t *testing.T, env *Loader) {
 				env.WithEnvSuffix("test")
@@ -254,7 +248,7 @@ func TestLoad(t *testing.T) {
 		{
 			name:       "with test ENV",
 			dir:        "testdata/a",
-			envVarName: testEnvVar,
+			envVarName: allEnvVars[0],
 			expect:     "testdata-test",
 			before: func(t *testing.T, env *Loader) {
 				t.Setenv("ENV", "test")
@@ -264,7 +258,7 @@ func TestLoad(t *testing.T) {
 		{
 			name:       "WithRootDir empty dir",
 			dir:        "testdata/a",
-			envVarName: testEnvVar,
+			envVarName: allEnvVars[0],
 			expect:     "",
 			before: func(t *testing.T, env *Loader) {
 				curDir := valueNoError[string](t)(os.Getwd())
@@ -274,8 +268,8 @@ func TestLoad(t *testing.T) {
 		{
 			name:       "WithRootDir testdata",
 			dir:        "testdata/a",
-			envVarName: testEnvVar,
-			expect:     testEnvVal,
+			envVarName: allEnvVars[0],
+			expect:     "testdata",
 			before: func(t *testing.T, env *Loader) {
 				curDir := valueNoError[string](t)(os.Getwd())
 				env.WithRootDir(filepath.Dir(curDir))
@@ -284,7 +278,7 @@ func TestLoad(t *testing.T) {
 		{
 			name:       "WithDepth 1",
 			dir:        "testdata/a",
-			envVarName: testEnvVar,
+			envVarName: allEnvVars[0],
 			expect:     "",
 			before: func(t *testing.T, env *Loader) {
 				env.WithDepth(1)
@@ -293,8 +287,8 @@ func TestLoad(t *testing.T) {
 		{
 			name:       "WithDepth 2",
 			dir:        "testdata/a",
-			envVarName: testEnvVar,
-			expect:     testEnvVal,
+			envVarName: allEnvVars[0],
+			expect:     "testdata",
 			before: func(t *testing.T, env *Loader) {
 				env.WithDepth(2)
 			},
@@ -302,7 +296,7 @@ func TestLoad(t *testing.T) {
 		{
 			name:       "with error from Load",
 			dir:        "testdata",
-			envVarName: testEnvVar,
+			envVarName: allEnvVars[0],
 			expectErr:  true,
 			before: func(t *testing.T, env *Loader) {
 				env.WithEnvSuffix("error")
@@ -311,7 +305,7 @@ func TestLoad(t *testing.T) {
 		{
 			name:       "WithRootCb stop at a",
 			dir:        "testdata/a",
-			envVarName: testEnvVar,
+			envVarName: allEnvVars[0],
 			expect:     "",
 			before: func(t *testing.T, env *Loader) {
 				env.WithRootCallback(func(path string) (bool, error) {
@@ -322,7 +316,7 @@ func TestLoad(t *testing.T) {
 		{
 			name:       "WithRootCb stop at testdata",
 			dir:        "testdata/a",
-			envVarName: testEnvVar,
+			envVarName: allEnvVars[0],
 			expect:     "testdata",
 			before: func(t *testing.T, env *Loader) {
 				curDir := valueNoError[string](t)(os.Getwd())
@@ -334,7 +328,7 @@ func TestLoad(t *testing.T) {
 		{
 			name:       "WithRootCb error",
 			dir:        "testdata/a",
-			envVarName: testEnvVar,
+			envVarName: allEnvVars[0],
 			expectErr:  true,
 			before: func(t *testing.T, env *Loader) {
 				env.WithRootCallback(func(path string) (bool, error) {
@@ -345,19 +339,15 @@ func TestLoad(t *testing.T) {
 		{
 			name:       "WithRootFiles stop at go.mod",
 			dir:        "testdata/b",
-			envVarName: testEnvVar,
+			envVarName: allEnvVars[0],
 			expect:     "",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			require.NoError(t, os.Chdir(tt.dir))
-			t.Cleanup(func() {
-				require.NoError(t, os.Chdir(curDir))
-			})
-			t.Setenv(tt.envVarName, "")
-			require.NoError(t, os.Unsetenv(tt.envVarName))
+			changeDir(t, tt.dir)
+			restoreEnvVars(t)
 			env := New()
 			if tt.before != nil {
 				tt.before(t, &env)
@@ -368,8 +358,105 @@ func TestLoad(t *testing.T) {
 				require.NoError(t, env.Load())
 				assert.Equal(t, tt.expect, os.Getenv(tt.envVarName),
 					"unexpected value of %v in %v dir", tt.envVarName, tt.dir)
-
 			}
+		})
+	}
+}
+
+func changeDir(t *testing.T, path string) {
+	curDir := valueNoError[string](t)(os.Getwd())
+	require.NoError(t, os.Chdir(path))
+	t.Cleanup(func() {
+		require.NoError(t, os.Chdir(curDir))
+	})
+}
+
+func restoreEnvVars(t *testing.T) {
+	for _, v := range allEnvVars {
+		t.Setenv(v, "")
+		require.NoError(t, os.Unsetenv(v))
+	}
+}
+
+func TestLoadTo(t *testing.T) {
+	type testStruct struct {
+		TestVar string `env:"TEST_VAR1"`
+	}
+
+	tests := []struct {
+		name     string
+		chDir    string
+		call     func(env *Loader, t *testing.T) []string
+		expected []string
+	}{
+		{
+			name: "optional args",
+			call: func(env *Loader, t *testing.T) (parsed []string) {
+				require.NoError(t, env.LoadTo())
+				return
+			},
+		},
+		{
+			name: "loaded nothing",
+			call: func(env *Loader, t *testing.T) []string {
+				cfg := testStruct{"default value"}
+				require.NoError(t, env.LoadTo(&cfg))
+				return []string{cfg.TestVar}
+			},
+			expected: []string{"default value"},
+		},
+		{
+			name:  "loaded one",
+			chDir: "testdata",
+			call: func(env *Loader, t *testing.T) []string {
+				cfg := testStruct{"default value"}
+				require.NoError(t, env.LoadTo(&cfg))
+				return []string{cfg.TestVar}
+			},
+			expected: []string{"testdata"},
+		},
+		{
+			name:  "loaded multiple",
+			chDir: "testdata",
+			call: func(env *Loader, t *testing.T) []string {
+				cfg1 := testStruct{"default value 1"}
+				cfg2 := struct {
+					TestVar string `env:"TEST_VAR2"`
+				}{"default value 2"}
+				require.NoError(t, env.LoadTo(&cfg1, &cfg2))
+				return []string{cfg1.TestVar, cfg2.TestVar}
+			},
+			expected: []string{"testdata", "testdata2"},
+		},
+		{
+			name:  "with err from Load",
+			chDir: "testdata",
+			call: func(env *Loader, t *testing.T) (parsed []string) {
+				require.Error(t, env.WithEnvSuffix("error").LoadTo())
+				return
+			},
+		},
+		{
+			name:  "with err from Parse",
+			chDir: "testdata",
+			call: func(env *Loader, t *testing.T) (parsed []string) {
+				cfg := struct {
+					TestVar bool `env:"TEST_VAR1"`
+				}{}
+				require.Error(t, env.LoadTo(&cfg))
+				return
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.chDir != "" {
+				changeDir(t, tt.chDir)
+			}
+			restoreEnvVars(t)
+			env := New()
+			assert.Equal(t, tt.expected, tt.call(&env, t))
 		})
 	}
 }

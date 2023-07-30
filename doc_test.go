@@ -1,6 +1,7 @@
 package dotenv_test
 
 import (
+	"fmt"
 	"log"
 	"os"
 
@@ -19,6 +20,20 @@ func Example_chainedCalls() {
 	if err := env.WithDepth(1).WithEnvSuffix("test").Load(); err != nil {
 		log.Fatalf("error loading .env files: %v", err)
 	}
+}
+
+func Example_withParse() {
+	env := dotenv.New()
+	cfg := struct {
+		SomeOpt string `env:"ENV_VAR1"`
+	}{
+		SomeOpt: "some default value, because we don't have .env file(s)",
+	}
+	if err := env.LoadTo(&cfg); err != nil {
+		log.Fatalf("error loading .env files: %v", err)
+	}
+	fmt.Println(cfg.SomeOpt)
+	// Output: some default value, because we don't have .env file(s)
 }
 
 func ExampleLoader_WithRootDir() {

@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/caarlos0/env/v9"
 	"github.com/joho/godotenv"
 )
 
@@ -155,6 +156,22 @@ func (self *Loader) Load() error {
 	return nil
 }
 
+// LoadTo loads all .env files like [Loader.Load] and fills every received
+// struct with values from environment variables, using [env.Parse]. It expects
+// zero or more args are pointers to structs. Without args it has no difference
+// from [Loader.Load].
+func (self *Loader) LoadTo(to ...any) error {
+	if err := self.Load(); err != nil {
+		return err
+	}
+	for _, v := range to {
+		if err := env.Parse(v); err != nil {
+			return fmt.Errorf("parse .env files into struct(s): %w", err)
+		}
+	}
+	return nil
+}
+
 // FileExistsInDir checks if file named fname exists in dir named dirName and
 // returns true, if it exists, or false.
 //
@@ -203,11 +220,9 @@ func (self *Loader) lookupEnvFiles() ([]string, error) {
 		}
 	}
 
-	if len(foundEnvs) > 0 {
-		return foundEnvs, nil
-	}
-
-	return nil, nil // nothing found
+	// At least one .env file exists, because lookupEnvDir() returned found ==
+	// true. So here we never return empty slice.
+	return foundEnvs, nil
 }
 
 // envFile returns list of .env files for searching, according to configured

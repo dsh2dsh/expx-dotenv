@@ -28,3 +28,18 @@ if err := env.WithDepth(1).WithEnvSuffix("test").Load(); err != nil {
 	log.Fatalf("error loading .env files: %v", err)
 }
 ```
+
+Load environment variables and parse them into a struct:
+```go
+env := dotenv.New()
+cfg := struct {
+		SomeOpt string `env:"ENV_VAR1"`
+}{
+		SomeOpt: "some default value, because we don't have .env file(s)",
+}
+if err := env.LoadTo(&cfg); err != nil {
+		log.Fatalf("error loading .env files: %v", err)
+}
+fmt.Println(cfg.SomeOpt)
+// Output: some default value, because we don't have .env file(s)
+```

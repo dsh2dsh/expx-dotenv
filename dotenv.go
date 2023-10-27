@@ -19,8 +19,8 @@ import (
 // New creates and returns an instance of .env loader [Loader]. By default it
 // searches for .env file(s) until it reaches of the root or any parent dir
 // where go.mod file exists.
-func New() Loader {
-	return Loader{
+func New() *Loader {
+	return &Loader{
 		rootDir:   string(filepath.Separator),
 		rootFiles: []string{"go.mod"},
 	}

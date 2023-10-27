@@ -20,23 +20,23 @@ func valueNoError[V any](t *testing.T) func(val V, err error) V {
 
 func TestWithDepth(t *testing.T) {
 	env := New()
-	assert.Equal(t, env.lookupDepth, 0)
-	assert.Same(t, &env, env.WithDepth(env.lookupDepth+1))
-	assert.Equal(t, env.lookupDepth, 1)
+	assert.Equal(t, 0, env.lookupDepth)
+	assert.Same(t, env, env.WithDepth(env.lookupDepth+1))
+	assert.Equal(t, 1, env.lookupDepth)
 }
 
 func TestWithEnvVarName(t *testing.T) {
 	env := New()
 	assert.Equal(t, "", env.envSuffix)
 	t.Setenv("ENV", "123")
-	assert.Same(t, &env, env.WithEnvVarName("ENV"))
+	assert.Same(t, env, env.WithEnvVarName("ENV"))
 	assert.Equal(t, "123", env.envSuffix)
 }
 
 func TestWithEnvSuffix(t *testing.T) {
 	env := New()
 	assert.Equal(t, "", env.envSuffix)
-	assert.Same(t, &env, env.WithEnvSuffix("123"))
+	assert.Same(t, env, env.WithEnvSuffix("123"))
 	assert.Equal(t, "123", env.envSuffix)
 }
 
@@ -74,7 +74,7 @@ func TestWithRootDir(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		assert.Same(t, &env, env.WithRootDir(tt.withRootDir))
+		assert.Same(t, env, env.WithRootDir(tt.withRootDir))
 		assert.Equal(t, tt.expect, env.rootDir)
 	}
 }
@@ -104,7 +104,7 @@ func TestWithRootCallback(t *testing.T) {
 		return false, os.ErrNotExist
 	})
 	_, err := env.stopByRootCb("")
-	assert.ErrorIs(t, err, os.ErrNotExist)
+	require.ErrorIs(t, err, os.ErrNotExist)
 
 	env.WithRootCallback(func(path string) (bool, error) {
 		return path == "/", nil
@@ -350,7 +350,7 @@ func TestLoad(t *testing.T) {
 			restoreEnvVars(t)
 			env := New()
 			if tt.before != nil {
-				tt.before(t, &env)
+				tt.before(t, env)
 			}
 			if tt.expectErr {
 				require.Error(t, env.Load())
@@ -456,7 +456,7 @@ func TestLoadTo(t *testing.T) {
 			}
 			restoreEnvVars(t)
 			env := New()
-			assert.Equal(t, tt.expected, tt.call(&env, t))
+			assert.Equal(t, tt.expected, tt.call(env, t))
 		})
 	}
 }
@@ -475,5 +475,5 @@ func TestLoad_errorGetwd(t *testing.T) {
 
 	env := New()
 	require.NoError(t, os.RemoveAll(tmpDir))
-	assert.Error(t, env.Load())
+	require.Error(t, env.Load())
 }

@@ -3,7 +3,6 @@ module github.com/dsh2dsh/expx-dotenv
 go 1.21
 
 require (
-	github.com/caarlos0/env/v9 v9.0.0
 	github.com/joho/godotenv v1.5.1
 	github.com/stretchr/testify v1.8.4
 )

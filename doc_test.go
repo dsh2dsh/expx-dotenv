@@ -1,11 +1,8 @@
 package dotenv_test
 
 import (
-	"fmt"
 	"log"
 	"os"
-
-	"github.com/caarlos0/env/v9"
 
 	dotenv "github.com/dsh2dsh/expx-dotenv"
 )
@@ -22,23 +19,23 @@ func Example_chainedCalls() {
 	}
 }
 
-func Example_withParse() {
-	cfg := struct {
-		SomeOpt string `env:"ENV_VAR1"`
-	}{
-		SomeOpt: "some default value, because we don't have .env file(s)",
-	}
+// func Example_withParse() {
+// 	cfg := struct {
+// 		SomeOpt string `env:"ENV_VAR1"`
+// 	}{
+// 		SomeOpt: "some default value, because we don't have .env file(s)",
+// 	}
 
-	err := dotenv.New().Load(func() error {
-		return env.Parse(&cfg) //nolint:wrapcheck
-	})
-	if err != nil {
-		log.Fatalf("error loading .env files: %v", err)
-	}
+// 	err := dotenv.New().Load(func() error {
+// 		return env.Parse(&cfg) //nolint:wrapcheck
+// 	})
+// 	if err != nil {
+// 		log.Fatalf("error loading .env files: %v", err)
+// 	}
 
-	fmt.Println(cfg.SomeOpt)
-	// Output: some default value, because we don't have .env file(s)
-}
+// 	fmt.Println(cfg.SomeOpt)
+// 	// Output: some default value, because we don't have .env file(s)
+// }
 
 func ExampleLoader_WithRootDir() {
 	// "ENV_ROOT" environment variable contains name of current environment.

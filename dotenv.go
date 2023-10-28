@@ -33,7 +33,7 @@ func (self stdFiler) Stat(name string) (os.FileInfo, error) {
 // searches for .env file(s) until it reaches of the root or any parent dir
 // where go.mod file exists.
 //
-// Creation time options can be change by opts.
+// Creation time options can be changed by opts.
 func New(opts ...Option) *Loader {
 	l := &Loader{
 		rootDir:   string(filepath.Separator),
@@ -182,6 +182,25 @@ func (self *Loader) WithRootCallback(fn func(path string) (bool, error),
 // variable "A" defined in .env.local file, it can't be redefined by variable
 // "A" from .env file. Or if env variable "A" somehow defined before calling
 // Load, it keeps its value and can't be redefined by .env files.
+//
+// After succesfull loading of .env file(s) it calls functions from cbs one by
+// one. It stops calling callbacks after first error. Here an example of using
+// [env] to parse env vars into a struct:
+//
+//	cfg := struct {
+//		SomeOpt string `env:"ENV_VAR1"`
+//	}{
+//		SomeOpt: "some default value, because we don't have .env file(s)",
+//	}
+//
+//	err := dotenv.New().Load(func() error {
+//		return env.Parse(&cfg)
+//	})
+//	if err != nil {
+//		log.Fatalf("error loading .env files: %v", err)
+//	}
+//
+// [env]: https://github.com/caarlos0/env
 func (self *Loader) Load(cbs ...func() error) error {
 	envs, err := self.lookupEnvFiles()
 	if err != nil {

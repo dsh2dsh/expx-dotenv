@@ -476,3 +476,90 @@ func TestLoader_lookupEnvFiles_error(t *testing.T) {
 	require.ErrorIs(t, err, os.ErrInvalid)
 	assert.Nil(t, envs)
 }
+
+func TestLoader_Load_withCallbacks(t *testing.T) {
+	var callCnt int
+
+	tests := []struct {
+		name      string
+		callbacks []func() error
+		wantErr   error
+		assert    func(t *testing.T)
+	}{
+		{
+			name: "called without error",
+			callbacks: []func() error{
+				func() error {
+					callCnt++
+					return nil
+				},
+			},
+			assert: func(t *testing.T) {
+				assert.Equal(t, 1, callCnt)
+			},
+		},
+		{
+			name: "called all without error",
+			callbacks: []func() error{
+				func() error {
+					callCnt++
+					return nil
+				},
+				func() error {
+					callCnt++
+					return nil
+				},
+			},
+			assert: func(t *testing.T) {
+				assert.Equal(t, 2, callCnt)
+			},
+		},
+		{
+			name: "with first error",
+			callbacks: []func() error{
+				func() error {
+					callCnt++
+					return os.ErrInvalid
+				},
+				func() error {
+					callCnt++
+					return nil
+				},
+			},
+			wantErr: os.ErrInvalid,
+			assert: func(t *testing.T) {
+				assert.Equal(t, 1, callCnt)
+			},
+		},
+		{
+			name: "with last error",
+			callbacks: []func() error{
+				func() error {
+					callCnt++
+					return nil
+				},
+				func() error {
+					callCnt++
+					return os.ErrInvalid
+				},
+			},
+			wantErr: os.ErrInvalid,
+			assert: func(t *testing.T) {
+				assert.Equal(t, 2, callCnt)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			callCnt = 0
+			err := New().WithDepth(1).Load(tt.callbacks...)
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+			} else {
+				require.NoError(t, err)
+			}
+			tt.assert(t)
+		})
+	}
+}

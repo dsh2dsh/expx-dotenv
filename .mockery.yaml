@@ -1,0 +1,8 @@
+dir: "internal/mocks"
+disable-version-string: True
+outpkg: "mocks"
+with-expecter: True
+packages:
+  github.com/dsh2dsh/expx-dotenv:
+    interfaces:
+      Filer:

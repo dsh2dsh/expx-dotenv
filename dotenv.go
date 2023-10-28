@@ -4,6 +4,8 @@
 //
 // [godotenv]: https://github.com/joho/godotenv
 // [original rules]: https://github.com/bkeepers/dotenv#what-other-env-files-can-i-use
+//
+//go:generate mockery
 package dotenv
 
 import (
@@ -16,13 +18,47 @@ import (
 	"github.com/joho/godotenv"
 )
 
+// Filler implements access to OS functions
+type Filer interface {
+	// Stat returns a FileInfo describing the named file, see [os.Stat].
+	Stat(name string) (os.FileInfo, error)
+}
+
+type stdFiler struct{}
+
+func (self stdFiler) Stat(name string) (os.FileInfo, error) {
+	return os.Stat(name) //nolint:wrapcheck // return it as is
+}
+
 // New creates and returns an instance of .env loader [Loader]. By default it
 // searches for .env file(s) until it reaches of the root or any parent dir
 // where go.mod file exists.
-func New() *Loader {
-	return &Loader{
+//
+// Creation time options can be change by opts.
+func New(opts ...Option) *Loader {
+	l := &Loader{
 		rootDir:   string(filepath.Separator),
 		rootFiles: []string{"go.mod"},
+	}
+
+	for _, opt := range opts {
+		opt(l)
+	}
+
+	if l.filer == nil {
+		l.filer = stdFiler{}
+	}
+	return l
+}
+
+// Option configures [Loader] somehow
+type Option func(l *Loader)
+
+// WithFiler configures [Loader] with custom implementation of [Filer]
+// interface.
+func WithFiler(f Filer) Option {
+	return func(l *Loader) {
+		l.filer = f
 	}
 }
 
@@ -46,6 +82,9 @@ type Loader struct {
 	// rootFiles contains list of file names for marking root dir. If current or
 	// any parent dir has any of file from this list, we'll stop at that dir.
 	rootFiles []string
+
+	// filer contains an interface to OS functions
+	filer Filer
 }
 
 // WithDepth configures [Loader.Load] don't go up deeper and stop searching for
@@ -144,13 +183,22 @@ func (self *Loader) WithRootCallback(fn func(path string) (bool, error),
 // variable "A" defined in .env.local file, it can't be redefined by variable
 // "A" from .env file. Or if env variable "A" somehow defined before calling
 // Load, it keeps its value and can't be redefined by .env files.
-func (self *Loader) Load() error {
-	if envs, err := self.lookupEnvFiles(); err != nil {
+func (self *Loader) Load(cbs ...func() error) error {
+	envs, err := self.lookupEnvFiles()
+	if err != nil {
 		return err
-	} else if len(envs) == 0 {
-		return nil
-	} else if err := godotenv.Load(envs...); err != nil {
-		return fmt.Errorf("can't load %v: %w", envs, err)
+	}
+
+	if len(envs) > 0 {
+		if err := godotenv.Load(envs...); err != nil {
+			return fmt.Errorf("can't load %v: %w", envs, err)
+		}
+	}
+
+	for _, cb := range cbs {
+		if err := cb(); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -161,15 +209,14 @@ func (self *Loader) Load() error {
 // zero or more args are pointers to structs. Without args it has no difference
 // from [Loader.Load].
 func (self *Loader) LoadTo(to ...any) error {
-	if err := self.Load(); err != nil {
-		return err
-	}
-	for _, v := range to {
-		if err := env.Parse(v); err != nil {
-			return fmt.Errorf("parse .env files into struct(s): %w", err)
+	return self.Load(func() error {
+		for _, v := range to {
+			if err := env.Parse(v); err != nil {
+				return fmt.Errorf("parse .env into struct: %w", err)
+			}
 		}
-	}
-	return nil
+		return nil
+	})
 }
 
 // FileExistsInDir checks if file named fname exists in dir named dirName and
@@ -181,7 +228,7 @@ func (self *Loader) FileExistsInDir(dirName, fname string) (bool, error) {
 		fname = filepath.Join(dirName, fname)
 	}
 
-	if _, err := os.Stat(fname); err == nil {
+	if _, err := self.filer.Stat(fname); err == nil {
 		return true, nil
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return false, fmt.Errorf("can't stat file '%s': %w", fname, err)

@@ -6,7 +6,10 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+
+	"github.com/dsh2dsh/expx-dotenv/internal/mocks"
 )
 
 var allEnvVars = []string{"TEST_VAR1", "TEST_VAR2"}
@@ -117,43 +120,82 @@ func TestFileExistsInDir(t *testing.T) {
 	hasFile := "dotenv_test.go"
 
 	tests := []struct {
-		dir    string
-		file   string
-		exists bool
+		name      string
+		dir       string
+		file      string
+		exists    bool
+		newLoader func() *Loader
+		cfgLoader func(l *Loader) *Loader
+		wantErr   error
 	}{
 		{
+			name:   "exists in empty dir",
 			dir:    "",
 			file:   hasFile,
 			exists: true,
 		},
 		{
+			name:   "exists in dot dir",
 			dir:    "./",
 			file:   hasFile,
 			exists: true,
 		},
 		{
+			name:   "exists in testdata",
 			dir:    "testdata",
 			file:   ".env",
 			exists: true,
 		},
 		{
-			dir:    "",
-			file:   "not exists",
-			exists: false,
+			name: "doesnt exists",
+			dir:  "",
+			file: "not exists",
+		},
+		{
+			name: "doesnt exists with error from Stat",
+			dir:  "",
+			file: hasFile,
+			newLoader: func() *Loader {
+				filer := mocks.NewMockFiler(t)
+				filer.EXPECT().Stat(hasFile).Return(nil, os.ErrNotExist)
+				return New(WithFiler(filer))
+			},
+		},
+		{
+			name: "error from Stat",
+			dir:  "",
+			file: hasFile,
+			newLoader: func() *Loader {
+				filer := mocks.NewMockFiler(t)
+				filer.EXPECT().Stat(hasFile).Return(nil, os.ErrInvalid)
+				return New(WithFiler(filer))
+			},
+			wantErr: os.ErrInvalid,
 		},
 	}
 
-	env := New()
 	for _, tt := range tests {
-		exists, err := env.FileExistsInDir(tt.dir, tt.file)
-		require.NoError(t, err)
-		if tt.exists {
-			assert.True(t, exists, "expected file %v exists in dir %v",
-				tt.file, tt.dir)
-		} else {
-			assert.False(t, exists, "not expected file %v exists in dir %v",
-				tt.file, tt.dir)
-		}
+		t.Run(tt.name, func(t *testing.T) {
+			var env *Loader
+			if tt.newLoader != nil {
+				env = tt.newLoader()
+			} else {
+				env = New()
+			}
+			exists, err := env.FileExistsInDir(tt.dir, tt.file)
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+			} else {
+				require.NoError(t, err)
+			}
+			if tt.exists {
+				assert.True(t, exists, "expected file %v exists in dir %v",
+					tt.file, tt.dir)
+			} else {
+				assert.False(t, exists, "not expected file %v exists in dir %v",
+					tt.file, tt.dir)
+			}
+		})
 	}
 }
 
@@ -476,4 +518,44 @@ func TestLoad_errorGetwd(t *testing.T) {
 	env := New()
 	require.NoError(t, os.RemoveAll(tmpDir))
 	require.Error(t, env.Load())
+}
+
+func TestLoader_nextParentDir_error(t *testing.T) {
+	filer := mocks.NewMockFiler(t)
+	filer.EXPECT().Stat(mock.Anything).Return(nil, os.ErrInvalid)
+	l := New(WithFiler(filer))
+
+	nextDir, err := l.nextParentDir("")
+	require.ErrorIs(t, err, os.ErrInvalid)
+	assert.Equal(t, "", nextDir)
+}
+
+func TestLoader_lookupEnvDir_error(t *testing.T) {
+	filer := mocks.NewMockFiler(t)
+	filer.EXPECT().Stat(mock.Anything).Return(nil, os.ErrInvalid)
+	l := New(WithFiler(filer))
+
+	found, envDir, err := l.lookupEnvDir(l.envFiles())
+	require.ErrorIs(t, err, os.ErrInvalid)
+	assert.False(t, found)
+	assert.Equal(t, "", envDir)
+}
+
+func TestLoader_lookupEnvFiles_error(t *testing.T) {
+	filer := mocks.NewMockFiler(t)
+	seen := make(map[string]struct{})
+	filer.EXPECT().Stat(mock.Anything).RunAndReturn(
+		func(name string) (os.FileInfo, error) {
+			if _, ok := seen[name]; !ok {
+				seen[name] = struct{}{}
+				return os.Stat(name) //nolint:wrapcheck // we don't need it in test
+			}
+			return nil, os.ErrInvalid
+		})
+
+	l := New(WithFiler(filer))
+	changeDir(t, "testdata")
+	envs, err := l.lookupEnvFiles()
+	require.ErrorIs(t, err, os.ErrInvalid)
+	assert.Nil(t, envs)
 }

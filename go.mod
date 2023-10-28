@@ -13,3 +13,5 @@ require (
 	github.com/stretchr/objx v0.5.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+retract [v1.1.0, v1.2.0]

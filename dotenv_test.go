@@ -248,7 +248,7 @@ func TestLoader_checkLookupDepth(t *testing.T) {
 	}
 }
 
-func TestLoad(t *testing.T) {
+func TestLoader_Load(t *testing.T) {
 	tests := []struct {
 		name       string
 		dir        string
@@ -420,7 +420,7 @@ func restoreEnvVars(t *testing.T) {
 	}
 }
 
-func TestLoad_errorGetwd(t *testing.T) {
+func TestLoader_Load_errorGetwd(t *testing.T) {
 	tmpDir := valueNoError[string](t)(os.MkdirTemp("", "expx-dotenv-"))
 	t.Cleanup(func() {
 		require.NoError(t, os.RemoveAll(tmpDir))
@@ -562,4 +562,11 @@ func TestLoader_Load_withCallbacks(t *testing.T) {
 			tt.assert(t)
 		})
 	}
+}
+
+func TestLoad(t *testing.T) {
+	changeDir(t, "testdata")
+	restoreEnvVars(t)
+	require.NoError(t, Load())
+	assert.Equal(t, "testdata", os.Getenv(allEnvVars[0]))
 }

@@ -17,6 +17,12 @@ import (
 	"github.com/joho/godotenv"
 )
 
+// Load loads .env files using default [Loader]. See [Loader.Load] for details
+// about callbacks.
+func Load(callbacks ...func() error) error {
+	return New().Load(callbacks...)
+}
+
 // Filler implements access to OS functions
 type Filer interface {
 	// Stat returns a FileInfo describing the named file, see [os.Stat].
@@ -55,11 +61,7 @@ type Option func(l *Loader)
 
 // WithFiler configures [Loader] with custom implementation of [Filer]
 // interface.
-func WithFiler(f Filer) Option {
-	return func(l *Loader) {
-		l.filer = f
-	}
-}
+func WithFiler(f Filer) Option { return func(l *Loader) { l.filer = f } }
 
 // Loader is a loader of .env files. Don't create it directly, use [New]
 // instead.
@@ -201,7 +203,7 @@ func (self *Loader) WithRootCallback(fn func(path string) (bool, error),
 //	}
 //
 // [env]: https://github.com/caarlos0/env
-func (self *Loader) Load(cbs ...func() error) error {
+func (self *Loader) Load(callbacks ...func() error) error {
 	envs, err := self.lookupEnvFiles()
 	if err != nil {
 		return err
@@ -213,7 +215,7 @@ func (self *Loader) Load(cbs ...func() error) error {
 		}
 	}
 
-	for _, cb := range cbs {
+	for _, cb := range callbacks {
 		if err := cb(); err != nil {
 			return err
 		}

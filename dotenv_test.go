@@ -465,7 +465,7 @@ func TestLoader_lookupEnvFiles_error(t *testing.T) {
 		func(name string) (os.FileInfo, error) {
 			if _, ok := seen[name]; !ok {
 				seen[name] = struct{}{}
-				return os.Stat(name) //nolint:wrapcheck // we don't need it in test
+				return os.Stat(name)
 			}
 			return nil, os.ErrInvalid
 		})

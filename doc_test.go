@@ -50,6 +50,6 @@ func ExampleLoader_WithRootFiles() {
 func ExampleLoader_WithRootCallback() {
 	env := dotenv.New()
 	env.WithRootCallback(func(path string) (bool, error) {
-		return env.FileExistsInDir(path, ".git") //nolint: wrapcheck
+		return env.FileExistsInDir(path, ".git")
 	})
 }

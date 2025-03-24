@@ -30,7 +30,7 @@ func TestWithDepth(t *testing.T) {
 
 func TestWithEnvVarName(t *testing.T) {
 	env := New()
-	assert.Equal(t, "", env.envSuffix)
+	assert.Empty(t, env.envSuffix)
 	t.Setenv("ENV", "123")
 	assert.Same(t, env, env.WithEnvVarName("ENV"))
 	assert.Equal(t, "123", env.envSuffix)
@@ -38,7 +38,7 @@ func TestWithEnvVarName(t *testing.T) {
 
 func TestWithEnvSuffix(t *testing.T) {
 	env := New()
-	assert.Equal(t, "", env.envSuffix)
+	assert.Empty(t, env.envSuffix)
 	assert.Same(t, env, env.WithEnvSuffix("123"))
 	assert.Equal(t, "123", env.envSuffix)
 }
@@ -421,11 +421,7 @@ func restoreEnvVars(t *testing.T) {
 }
 
 func TestLoader_Load_errorGetwd(t *testing.T) {
-	tmpDir := valueNoError[string](t)(os.MkdirTemp("", "expx-dotenv-"))
-	t.Cleanup(func() {
-		require.NoError(t, os.RemoveAll(tmpDir))
-	})
-
+	tmpDir := t.TempDir()
 	curDir := valueNoError[string](t)(os.Getwd())
 	require.NoError(t, os.Chdir(tmpDir))
 	t.Cleanup(func() {
@@ -444,7 +440,7 @@ func TestLoader_nextParentDir_error(t *testing.T) {
 
 	nextDir, err := l.nextParentDir("")
 	require.ErrorIs(t, err, os.ErrInvalid)
-	assert.Equal(t, "", nextDir)
+	assert.Empty(t, nextDir)
 }
 
 func TestLoader_lookupEnvDir_error(t *testing.T) {
@@ -455,7 +451,7 @@ func TestLoader_lookupEnvDir_error(t *testing.T) {
 	found, envDir, err := l.lookupEnvDir(l.envFiles())
 	require.ErrorIs(t, err, os.ErrInvalid)
 	assert.False(t, found)
-	assert.Equal(t, "", envDir)
+	assert.Empty(t, envDir)
 }
 
 func TestLoader_lookupEnvFiles_error(t *testing.T) {

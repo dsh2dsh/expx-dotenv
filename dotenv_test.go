@@ -6,10 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-
-	"github.com/dsh2dsh/expx-dotenv/internal/mocks"
 )
 
 var allEnvVars = []string{"TEST_VAR1", "TEST_VAR2"}
@@ -21,14 +18,13 @@ func valueNoError[V any](t *testing.T) func(val V, err error) V {
 	}
 }
 
-func TestWithDepth(t *testing.T) {
+func TestLoader_WithDepth(t *testing.T) {
 	env := New()
-	assert.Equal(t, 0, env.lookupDepth)
-	assert.Same(t, env, env.WithDepth(env.lookupDepth+1))
-	assert.Equal(t, 1, env.lookupDepth)
+	assert.Same(t, env, env.WithDepth(env.lookup.lookupDepth+1))
+	assert.Equal(t, 1, env.lookup.lookupDepth)
 }
 
-func TestWithEnvVarName(t *testing.T) {
+func TestLoader_WithEnvVarName(t *testing.T) {
 	env := New()
 	assert.Empty(t, env.envSuffix)
 	t.Setenv("ENV", "123")
@@ -36,16 +32,16 @@ func TestWithEnvVarName(t *testing.T) {
 	assert.Equal(t, "123", env.envSuffix)
 }
 
-func TestWithEnvSuffix(t *testing.T) {
+func TestLoader_WithEnvSuffix(t *testing.T) {
 	env := New()
 	assert.Empty(t, env.envSuffix)
 	assert.Same(t, env, env.WithEnvSuffix("123"))
 	assert.Equal(t, "123", env.envSuffix)
 }
 
-func TestWithRootDir(t *testing.T) {
+func TestLoader_WithRootDir(t *testing.T) {
 	env := New()
-	assert.Equal(t, string(filepath.Separator), env.rootDir)
+	assert.Equal(t, string(filepath.Separator), env.lookup.rootDir)
 
 	curDir := valueNoError[string](t)(os.Getwd())
 	parentDir := valueNoError[string](t)(filepath.Abs("../"))
@@ -78,125 +74,26 @@ func TestWithRootDir(t *testing.T) {
 
 	for _, tt := range tests {
 		assert.Same(t, env, env.WithRootDir(tt.withRootDir))
-		assert.Equal(t, tt.expect, env.rootDir)
+		assert.Equal(t, tt.expect, env.lookup.rootDir)
 	}
 }
 
-func TestWithRootFiles(t *testing.T) {
+func TestLoader_WithRootFiles(t *testing.T) {
 	env := New()
-	assert.Equal(t, []string{"go.mod"}, env.rootFiles)
+	assert.Equal(t, []string{"go.mod"}, env.lookup.rootFiles)
 	env.WithRootFiles(".git", "go.mod")
-	assert.Equal(t, []string{".git", "go.mod"}, env.rootFiles)
+	assert.Equal(t, []string{".git", "go.mod"}, env.lookup.rootFiles)
 }
 
-func TestWithRootCallback(t *testing.T) {
+func TestLoader_FileExistsInDir(t *testing.T) {
 	env := New()
-	assert.Nil(t, env.rootCb)
-	assert.False(t, valueNoError[bool](t)(env.stopByRootCb("")))
+	exists, err := env.FileExistsInDir("", "dotenv_test.go")
+	require.NoError(t, err)
+	assert.True(t, exists)
 
-	var count int
-	env.WithRootCallback(func(path string) (bool, error) {
-		count++
-		return true, nil
-	})
-	assert.NotNil(t, env.rootCb)
-	assert.True(t, valueNoError[bool](t)(env.stopByRootCb("")))
-	assert.Equal(t, 1, count)
-
-	env.WithRootCallback(func(path string) (bool, error) {
-		return false, os.ErrNotExist
-	})
-	_, err := env.stopByRootCb("")
-	require.ErrorIs(t, err, os.ErrNotExist)
-
-	env.WithRootCallback(func(path string) (bool, error) {
-		return path == "/", nil
-	})
-	assert.False(t, valueNoError[bool](t)(env.stopByRootCb("")))
-	assert.True(t, valueNoError[bool](t)(env.stopByRootCb("/")))
-}
-
-func TestFileExistsInDir(t *testing.T) {
-	hasFile := "dotenv_test.go"
-
-	tests := []struct {
-		name      string
-		dir       string
-		file      string
-		exists    bool
-		newLoader func() *Loader
-		cfgLoader func(l *Loader) *Loader
-		wantErr   error
-	}{
-		{
-			name:   "exists in empty dir",
-			dir:    "",
-			file:   hasFile,
-			exists: true,
-		},
-		{
-			name:   "exists in dot dir",
-			dir:    "./",
-			file:   hasFile,
-			exists: true,
-		},
-		{
-			name:   "exists in testdata",
-			dir:    "testdata",
-			file:   ".env",
-			exists: true,
-		},
-		{
-			name: "doesnt exists",
-			dir:  "",
-			file: "not exists",
-		},
-		{
-			name: "doesnt exists with error from Stat",
-			dir:  "",
-			file: hasFile,
-			newLoader: func() *Loader {
-				filer := mocks.NewMockFiler(t)
-				filer.EXPECT().Stat(hasFile).Return(nil, os.ErrNotExist)
-				return New(WithFiler(filer))
-			},
-		},
-		{
-			name: "error from Stat",
-			dir:  "",
-			file: hasFile,
-			newLoader: func() *Loader {
-				filer := mocks.NewMockFiler(t)
-				filer.EXPECT().Stat(hasFile).Return(nil, os.ErrInvalid)
-				return New(WithFiler(filer))
-			},
-			wantErr: os.ErrInvalid,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			var env *Loader
-			if tt.newLoader != nil {
-				env = tt.newLoader()
-			} else {
-				env = New()
-			}
-			exists, err := env.FileExistsInDir(tt.dir, tt.file)
-			if tt.wantErr != nil {
-				require.ErrorIs(t, err, tt.wantErr)
-			} else {
-				require.NoError(t, err)
-			}
-			if tt.exists {
-				assert.True(t, exists, "expected file %v exists in dir %v",
-					tt.file, tt.dir)
-			} else {
-				assert.False(t, exists, "not expected file %v exists in dir %v",
-					tt.file, tt.dir)
-			}
-		})
-	}
+	exists, err = env.FileExistsInDir("", "not exists")
+	require.NoError(t, err)
+	assert.False(t, exists)
 }
 
 func TestLoader_envFiles(t *testing.T) {
@@ -207,45 +104,6 @@ func TestLoader_envFiles(t *testing.T) {
 	assert.Equal(t,
 		[]string{".env.test.local", ".env.local", ".env.test", ".env"},
 		env.envFiles())
-}
-
-func TestLoader_checkLookupDepth(t *testing.T) {
-	tests := []struct {
-		name        string
-		lookupDepth int
-		curDepth    int
-		expect      int
-	}{
-		{
-			name:        "with negative lookupDepth",
-			lookupDepth: -1,
-			expect:      0,
-		},
-		{
-			name:        "with zero lookupDepth",
-			lookupDepth: 0,
-			expect:      0,
-		},
-		{
-			name:        "with positive lookupDepth and zero curDepth",
-			lookupDepth: 2,
-			expect:      1,
-		},
-		{
-			name:        "with positive lookupDepth and one curDepth",
-			lookupDepth: 2,
-			curDepth:    1,
-			expect:      -1,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			env := New()
-			env.WithDepth(tt.lookupDepth)
-			assert.Equal(t, tt.expect, env.checkLookupDepth(tt.curDepth))
-		})
-	}
 }
 
 func TestLoader_Load(t *testing.T) {
@@ -388,7 +246,7 @@ func TestLoader_Load(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			changeDir(t, tt.dir)
+			t.Chdir(tt.dir)
 			restoreEnvVars(t)
 			env := New()
 			if tt.before != nil {
@@ -405,14 +263,6 @@ func TestLoader_Load(t *testing.T) {
 	}
 }
 
-func changeDir(t *testing.T, path string) {
-	curDir := valueNoError[string](t)(os.Getwd())
-	require.NoError(t, os.Chdir(path))
-	t.Cleanup(func() {
-		require.NoError(t, os.Chdir(curDir))
-	})
-}
-
 func restoreEnvVars(t *testing.T) {
 	for _, v := range allEnvVars {
 		t.Setenv(v, "")
@@ -422,55 +272,11 @@ func restoreEnvVars(t *testing.T) {
 
 func TestLoader_Load_errorGetwd(t *testing.T) {
 	tmpDir := t.TempDir()
-	curDir := valueNoError[string](t)(os.Getwd())
-	require.NoError(t, os.Chdir(tmpDir))
-	t.Cleanup(func() {
-		require.NoError(t, os.Chdir(curDir))
-	})
+	t.Chdir(tmpDir)
 
 	env := New()
 	require.NoError(t, os.RemoveAll(tmpDir))
 	require.Error(t, env.Load())
-}
-
-func TestLoader_nextParentDir_error(t *testing.T) {
-	filer := mocks.NewMockFiler(t)
-	filer.EXPECT().Stat(mock.Anything).Return(nil, os.ErrInvalid)
-	l := New(WithFiler(filer))
-
-	nextDir, err := l.nextParentDir("")
-	require.ErrorIs(t, err, os.ErrInvalid)
-	assert.Empty(t, nextDir)
-}
-
-func TestLoader_lookupEnvDir_error(t *testing.T) {
-	filer := mocks.NewMockFiler(t)
-	filer.EXPECT().Stat(mock.Anything).Return(nil, os.ErrInvalid)
-	l := New(WithFiler(filer))
-
-	found, envDir, err := l.lookupEnvDir(l.envFiles())
-	require.ErrorIs(t, err, os.ErrInvalid)
-	assert.False(t, found)
-	assert.Empty(t, envDir)
-}
-
-func TestLoader_lookupEnvFiles_error(t *testing.T) {
-	filer := mocks.NewMockFiler(t)
-	seen := make(map[string]struct{})
-	filer.EXPECT().Stat(mock.Anything).RunAndReturn(
-		func(name string) (os.FileInfo, error) {
-			if _, ok := seen[name]; !ok {
-				seen[name] = struct{}{}
-				return os.Stat(name)
-			}
-			return nil, os.ErrInvalid
-		})
-
-	l := New(WithFiler(filer))
-	changeDir(t, "testdata")
-	envs, err := l.lookupEnvFiles()
-	require.ErrorIs(t, err, os.ErrInvalid)
-	assert.Nil(t, envs)
 }
 
 func TestLoader_Load_withCallbacks(t *testing.T) {
@@ -561,7 +367,7 @@ func TestLoader_Load_withCallbacks(t *testing.T) {
 }
 
 func TestLoad(t *testing.T) {
-	changeDir(t, "testdata")
+	t.Chdir("testdata")
 	restoreEnvVars(t)
 	require.NoError(t, Load())
 	assert.Equal(t, "testdata", os.Getenv(allEnvVars[0]))

@@ -9,7 +9,6 @@
 package dotenv
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -19,80 +18,35 @@ import (
 
 // Load loads .env files using default [Loader]. See [Loader.Load] for details
 // about callbacks.
-func Load(callbacks ...func() error) error {
-	return New().Load(callbacks...)
-}
-
-// Filler implements access to OS functions
-type Filer interface {
-	// Stat returns a FileInfo describing the named file, see [os.Stat].
-	Stat(name string) (os.FileInfo, error)
-}
-
-type stdFiler struct{}
-
-func (self stdFiler) Stat(name string) (os.FileInfo, error) {
-	return os.Stat(name) //nolint:wrapcheck // return it as is
-}
+func Load(callbacks ...func() error) error { return New().Load(callbacks...) }
 
 // New creates and returns an instance of .env loader [Loader]. By default it
 // searches for .env file(s) until it reaches of the root or any parent dir
 // where go.mod file exists.
 //
 // Creation time options can be changed by opts.
-func New(opts ...Option) *Loader {
-	l := &Loader{
-		rootDir:   string(filepath.Separator),
-		rootFiles: []string{"go.mod"},
+func New() *Loader {
+	return &Loader{
+		lookup: NewLookup().
+			WithRootDir(string(filepath.Separator)).
+			WithRootFiles("go.mod"),
 	}
-
-	for _, opt := range opts {
-		opt(l)
-	}
-
-	if l.filer == nil {
-		l.filer = stdFiler{}
-	}
-	return l
 }
-
-// Option configures [Loader] somehow
-type Option func(l *Loader)
-
-// WithFiler configures [Loader] with custom implementation of [Filer]
-// interface.
-func WithFiler(f Filer) Option { return func(l *Loader) { l.filer = f } }
 
 // Loader is a loader of .env files. Don't create it directly, use [New]
 // instead.
 type Loader struct {
+	lookup *Lookup
+
 	// envSuffix is a suffix of .env files for current environment
 	envSuffix string
-
-	// lookupDepth defines how many dirs could be checked before stop. It starts
-	// at 1 and it means current dir only. 2 and more means check also parent
-	// dirs. 0 means not configured.
-	lookupDepth int
-
-	// rootCb is a function, which returns should we stop at current dir or go up.
-	rootCb func(path string) (bool, error)
-
-	// rootDir is a dir to stop and don't go up
-	rootDir string
-
-	// rootFiles contains list of file names for marking root dir. If current or
-	// any parent dir has any of file from this list, we'll stop at that dir.
-	rootFiles []string
-
-	// filer contains an interface to OS functions
-	filer Filer
 }
 
 // WithDepth configures [Loader.Load] don't go up deeper and stop searching for
 // .env files at n level. Current dir has n == 1, first parent dir has n == 2
 // and so on.
 func (self *Loader) WithDepth(n int) *Loader {
-	self.lookupDepth = n
+	self.lookup.WithDepth(n)
 	return self
 }
 
@@ -126,16 +80,14 @@ func (self *Loader) WithEnvSuffix(s string) *Loader {
 
 // WithRootDir configures [Loader.Load] to stop at path dir and don't go up.
 func (self *Loader) WithRootDir(path string) *Loader {
-	if absPath, err := filepath.Abs(path); err == nil {
-		self.rootDir = absPath
-	}
+	self.lookup.WithRootDir(path)
 	return self
 }
 
 // WithRootFiles configures [Loader.Load] to stop at current dir or any parent
 // dir, which contains any of file (or dir) with name from fnames list.
 func (self *Loader) WithRootFiles(fnames ...string) *Loader {
-	self.rootFiles = fnames
+	self.lookup.WithRootFiles(fnames...)
 	return self
 }
 
@@ -149,8 +101,16 @@ func (self *Loader) WithRootFiles(fnames ...string) *Loader {
 // [Loader.FileExistsInDir] may be useful in here.
 func (self *Loader) WithRootCallback(fn func(path string) (bool, error),
 ) *Loader {
-	self.rootCb = fn
+	self.lookup.WithRootCallback(fn)
 	return self
+}
+
+// FileExistsInDir checks if file named fname exists in dir named dirName and
+// returns true, if it exists, or false.
+//
+// May be useful in a callback, configured by [Loader.WithRootCallback].
+func (self *Loader) FileExistsInDir(dirName, fname string) (bool, error) {
+	return self.lookup.FileExistsInDir(dirName, fname)
 }
 
 // Load loads .env files in current dir if any of them exists. If nothing was
@@ -204,7 +164,7 @@ func (self *Loader) WithRootCallback(fn func(path string) (bool, error),
 //
 // [env]: https://github.com/caarlos0/env
 func (self *Loader) Load(callbacks ...func() error) error {
-	envs, err := self.lookupEnvFiles()
+	envs, err := self.lookup.Lookup(self.envFiles()...)
 	if err != nil {
 		return err
 	}
@@ -220,176 +180,20 @@ func (self *Loader) Load(callbacks ...func() error) error {
 			return err
 		}
 	}
-
 	return nil
-}
-
-// FileExistsInDir checks if file named fname exists in dir named dirName and
-// returns true, if it exists, or false.
-//
-// May be useful in a callback, configured by [Loader.WithRootCallback].
-func (self *Loader) FileExistsInDir(dirName, fname string) (bool, error) {
-	if dirName != "" {
-		fname = filepath.Join(dirName, fname)
-	}
-
-	if _, err := self.filer.Stat(fname); err == nil {
-		return true, nil
-	} else if !errors.Is(err, os.ErrNotExist) {
-		return false, fmt.Errorf("can't stat file '%s': %w", fname, err)
-	}
-
-	return false, nil
-}
-
-// lookupEnvFiles is searching for .env files, starting from current dir, and
-// returns list of found files or nil if nothing found.
-//
-// If .env files were found in one of parent dirs, their names are absolute
-// paths. If they are in current dir, returned list will contain just their
-// names.
-func (self *Loader) lookupEnvFiles() ([]string, error) {
-	envs := self.envFiles()
-
-	found, envDir, err := self.lookupEnvDir(envs)
-	if err != nil {
-		return nil, fmt.Errorf("got error looking for %v: %w", envs, err)
-	} else if !found {
-		return nil, nil
-	}
-
-	// foundEnvs will overwrite envs and it's safe, because we append into
-	// foundEnvs the same number of items or less.
-	foundEnvs := envs[:0]
-	for _, envFile := range envs {
-		if exists, err := self.FileExistsInDir(envDir, envFile); err != nil {
-			return nil, err
-		} else if exists {
-			if envDir != "" {
-				envFile = filepath.Join(envDir, envFile)
-			}
-			foundEnvs = append(foundEnvs, envFile)
-		}
-	}
-
-	// At least one .env file exists, because lookupEnvDir() returned found ==
-	// true. So here we never return empty slice.
-	return foundEnvs, nil
 }
 
 // envFile returns list of .env files for searching, according to configured
 // name of environment. See [Loader.Load] for details.
 func (self *Loader) envFiles() []string {
-	envName := self.envSuffix
-	if envName == "" {
+	if self.envSuffix == "" {
 		return []string{".env.local", ".env"}
 	}
 
 	return []string{
-		".env." + envName + ".local", ".env.local",
-		".env." + envName, ".env",
+		".env." + self.envSuffix + ".local",
+		".env.local",
+		".env." + self.envSuffix,
+		".env",
 	}
-}
-
-// lookupEnvDir is searching for a dir, which contains any of files with names
-// from envFiles list. It returns:
-//
-//  1. true, if found any of files, or false.
-//  2. dir name if any file was found
-//  3. any error
-//
-// Returned dir name is absolute path or empty string, which means current dir.
-//
-// It starts searching at current dir, next tries parent dir, parent of parent
-// dir and so on, until it reaches configured root.
-func (self *Loader) lookupEnvDir(envFiles []string) (bool, string, error) {
-	curDir := ""
-	depth := 0
-
-	for {
-		for _, envFile := range envFiles {
-			if exists, err := self.FileExistsInDir(curDir, envFile); err != nil {
-				return false, "", err
-			} else if exists {
-				return exists, curDir, nil
-			}
-		}
-
-		if depth = self.checkLookupDepth(depth); depth < 0 {
-			break
-		}
-
-		if newDir, err := self.nextParentDir(curDir); err != nil {
-			return false, "", fmt.Errorf("next parent dir of %v: %w", curDir, err)
-		} else if newDir == "" {
-			break
-		} else {
-			curDir = newDir
-		}
-	}
-
-	return false, "", nil
-}
-
-// checkLookupDepth compares current dir level curDir with configured one and
-// returns -1, if reached configured limit, or next level. It expects curDir >=
-// 0.
-//
-// It understands the limit is configured if lookupDepth > 0.
-func (self *Loader) checkLookupDepth(curDepth int) int {
-	if self.lookupDepth > 0 {
-		curDepth++
-		if curDepth == self.lookupDepth {
-			return -1
-		}
-	}
-
-	return curDepth
-}
-
-// nextParentDir returns parent dir of curDir or empty string, if it configured
-// to stop at curDir. It expects curDir is an absolute path or empty string,
-// which means current dir.
-func (self *Loader) nextParentDir(curDir string) (string, error) {
-	if curDir == "" {
-		if dir, err := os.Getwd(); err != nil {
-			return "", fmt.Errorf("can't get current dir: %w", err)
-		} else {
-			curDir = dir
-		}
-	}
-
-	if stopHere, err := self.stopByRootCb(curDir); err != nil {
-		return "", err
-	} else if stopHere {
-		return "", nil
-	} else if curDir == self.rootDir {
-		return "", nil
-	}
-
-	for _, fname := range self.rootFiles {
-		if exists, err := self.FileExistsInDir(curDir, fname); err != nil {
-			return "", fmt.Errorf("check existence of file %v in dir %v: %w", fname,
-				curDir, err)
-		} else if exists {
-			return "", nil
-		}
-	}
-
-	return filepath.Dir(curDir), nil
-}
-
-// stopByRootCb calls a function, configured by [Loader.WithRootCallback], with
-// absolute path, and returns its return values. true means stop at this path
-// and false means continue to parent dir.
-func (self *Loader) stopByRootCb(path string) (bool, error) {
-	if self.rootCb != nil {
-		if stopHere, err := self.rootCb(path); err != nil {
-			return false, fmt.Errorf("check dir %v using root callback: %w", path, err)
-		} else {
-			return stopHere, nil
-		}
-	}
-
-	return false, nil
 }

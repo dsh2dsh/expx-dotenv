@@ -1,6 +1,7 @@
 package dotenv_test
 
 import (
+	"fmt"
 	"log"
 	"os"
 
@@ -14,7 +15,8 @@ func Example() {
 }
 
 func Example_chainedCalls() {
-	if err := dotenv.New().WithDepth(1).WithEnvSuffix("test").Load(); err != nil {
+	err := dotenv.New().WithDepth(1).WithEnvSuffix("test").Load()
+	if err != nil {
 		log.Fatalf("error loading .env files: %v", err)
 	}
 }
@@ -52,4 +54,13 @@ func ExampleLoader_WithRootCallback() {
 	env.WithRootCallback(func(path string) (bool, error) {
 		return env.FileExistsInDir(path, ".git")
 	})
+}
+
+func ExampleLookup_Lookup() {
+	found, err := dotenv.NewLookup().Lookup("go.mod", "go.sum", "not-exists")
+	fmt.Println(found)
+	fmt.Println(err)
+	// Output:
+	// [go.mod go.sum]
+	// <nil>
 }

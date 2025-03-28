@@ -3,7 +3,7 @@
 package mocks
 
 import (
-	fs "io/fs"
+	os "os"
 
 	mock "github.com/stretchr/testify/mock"
 )
@@ -22,19 +22,23 @@ func (_m *MockFiler) EXPECT() *MockFiler_Expecter {
 }
 
 // Stat provides a mock function with given fields: name
-func (_m *MockFiler) Stat(name string) (fs.FileInfo, error) {
+func (_m *MockFiler) Stat(name string) (os.FileInfo, error) {
 	ret := _m.Called(name)
 
-	var r0 fs.FileInfo
+	if len(ret) == 0 {
+		panic("no return value specified for Stat")
+	}
+
+	var r0 os.FileInfo
 	var r1 error
-	if rf, ok := ret.Get(0).(func(string) (fs.FileInfo, error)); ok {
+	if rf, ok := ret.Get(0).(func(string) (os.FileInfo, error)); ok {
 		return rf(name)
 	}
-	if rf, ok := ret.Get(0).(func(string) fs.FileInfo); ok {
+	if rf, ok := ret.Get(0).(func(string) os.FileInfo); ok {
 		r0 = rf(name)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(fs.FileInfo)
+			r0 = ret.Get(0).(os.FileInfo)
 		}
 	}
 
@@ -65,12 +69,12 @@ func (_c *MockFiler_Stat_Call) Run(run func(name string)) *MockFiler_Stat_Call {
 	return _c
 }
 
-func (_c *MockFiler_Stat_Call) Return(_a0 fs.FileInfo, _a1 error) *MockFiler_Stat_Call {
+func (_c *MockFiler_Stat_Call) Return(_a0 os.FileInfo, _a1 error) *MockFiler_Stat_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockFiler_Stat_Call) RunAndReturn(run func(string) (fs.FileInfo, error)) *MockFiler_Stat_Call {
+func (_c *MockFiler_Stat_Call) RunAndReturn(run func(string) (os.FileInfo, error)) *MockFiler_Stat_Call {
 	_c.Call.Return(run)
 	return _c
 }
